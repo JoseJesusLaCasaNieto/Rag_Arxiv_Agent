@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proyecto 1 — Asistente RAG sobre la tesis doctoral</title>
+<style>
+  :root {
+    --accent: #0d9488;
+    --accent-dark: #0f766e;
+    --ink: #1e293b;
+    --ink-soft: #475569;
+    --bg-sidebar: #f8fafc;
+    --border: #e2e8f0;
+    --blue: #1d4ed8;
+    --blue-bg: #eff6ff;
+    --blue-border: #93c5fd;
+    --amber: #92400e;
+    --amber-bg: #fffbeb;
+    --amber-border: #f59e0b;
+    --green: #15803d;
+    --green-bg: #f0fdf4;
+    --green-border: #86efac;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    color: var(--ink);
+    line-height: 1.6;
+    background: #ffffff;
+    font-size: 15.5px;
+  }
+  code, pre {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  }
+  code {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.88em;
+    color: #0f766e;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+
+  /* ---------- layout ---------- */
+  .layout { display: flex; min-height: 100vh; align-items: flex-start; }
+
+  nav.sidebar {
+    width: 268px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav.sidebar .brand {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--accent-dark);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  nav.sidebar .brand-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-bottom: 22px;
+    line-height: 1.4;
+  }
+  nav.sidebar ol {
+    list-style: none;
+    margin: 0; padding: 0;
+    counter-reset: navsec;
+  }
+  nav.sidebar li { margin-bottom: 2px; }
+  nav.sidebar a {
+    counter-increment: navsec;
+    display: block;
+    padding: 7px 10px;
+    border-radius: 6px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 13.6px;
+    line-height: 1.35;
+  }
+  nav.sidebar a::before {
+    content: counter(navsec) ". ";
+    color: var(--accent);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  nav.sidebar a:hover { background: #eef2f7; color: var(--ink); }
+
+  main {
+    flex: 1;
+    max-width: 840px;
+    padding: 44px 56px 90px 56px;
+  }
+
+  .doc-header { margin-bottom: 10px; }
+  .doc-kicker {
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 12.5px;
+    color: var(--accent-dark);
+    font-weight: 700;
+  }
+  h1.doc-title {
+    font-size: 27px;
+    margin: 6px 0 8px 0;
+    color: #0f172a;
+  }
+  .doc-meta {
+    font-size: 13px;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 18px;
+    margin-bottom: 30px;
+  }
+  .doc-meta span { margin-right: 18px; }
+
+  section { margin-bottom: 46px; scroll-margin-top: 20px; }
+  section h2 {
+    font-size: 20px;
+    color: #0f172a;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 8px;
+    margin: 0 0 14px 0;
+  }
+  section h3 {
+    font-size: 15.5px;
+    color: #0f172a;
+    margin: 22px 0 8px 0;
+  }
+  p { margin: 10px 0; }
+  ul, ol.plain { margin: 8px 0; padding-left: 22px; }
+  li { margin-bottom: 5px; }
+  strong { color: #0f172a; }
+
+  .callout {
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 14.3px;
+    border: 1px solid;
+  }
+  .callout .callabel {
+    font-weight: 700;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .callout.decision { background: var(--blue-bg); border-color: var(--blue-border); }
+  .callout.decision .callabel { color: var(--blue); }
+  .callout.open { background: var(--amber-bg); border-color: var(--amber-border); }
+  .callout.open .callabel { color: var(--amber); }
+  .callout.note { background: #f8fafc; border-color: var(--border); }
+  .callout.note .callabel { color: var(--ink-soft); }
+  .callout.done { background: var(--green-bg); border-color: var(--green-border); }
+  .callout.done .callabel { color: var(--green); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.8px; }
+  th { background: #0f172a; color: #fff; text-align: left; padding: 8px 10px; font-size: 12.8px; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.partial { color: var(--amber); font-weight: 600; }
+  td.no { color: #b91c1c; font-weight: 600; }
+
+  .phase {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 14px 0;
+  }
+  .phase .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .phase .phase-num {
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+  }
+  .phase .phase-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .phase .phase-goal { color: var(--ink-soft); font-size: 13.6px; margin-bottom: 8px; }
+  .phase ul { margin: 6px 0 0 0; }
+  .phase li { font-size: 13.8px; }
+
+  .diagram-wrap {
+    margin: 16px 0;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .diagram-caption { font-size: 12.3px; color: var(--ink-soft); font-style: italic; margin-top: 6px; }
+
+  .glossary dt { font-weight: 700; color: #0f172a; margin-top: 10px; font-size: 14px; }
+  .glossary dd { margin: 2px 0 0 0; color: var(--ink-soft); font-size: 13.8px; }
+
+  footer.doc-footer {
+    border-top: 1px solid var(--border);
+    margin-top: 50px;
+    padding-top: 16px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 900px) {
+    nav.sidebar { display: none; }
+    main { padding: 30px 22px; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">Proyecto 1 · Documento de contexto</div>
+  <div class="brand-sub">Asistente RAG + agente sobre documentos de la tesis doctoral</div>
+  <ol>
+    <li><a href="#resumen">Resumen ejecutivo</a></li>
+    <li><a href="#problema">El problema</a></li>
+    <li><a href="#planteamiento">Planteamiento de la solución</a></li>
+    <li><a href="#arquitectura">Arquitectura técnica</a></li>
+    <li><a href="#modelo-datos">Modelo de datos</a></li>
+    <li><a href="#alcance">Alcance — Núcleo Pareto</a></li>
+    <li><a href="#agente-tools">El agente y sus herramientas</a></li>
+    <li><a href="#requisitos">Requisitos del puesto cubiertos</a></li>
+    <li><a href="#plan-trabajo">Plan de trabajo por fases</a></li>
+    <li><a href="#preguntas-abiertas">Preguntas abiertas</a></li>
+    <li><a href="#como-usar">Cómo usar este documento</a></li>
+    <li><a href="#glosario">Glosario rápido</a></li>
+  </ol>
+</nav>
+
+<main>
+  <div class="doc-header">
+    <div class="doc-kicker">Documento de contexto técnico · v1</div>
+    <h1 class="doc-title">Proyecto 1 — Asistente RAG sobre los documentos de mi tesis doctoral</h1>
+  </div>
+  <div class="doc-meta">
+    <span><strong>Autor:</strong> Pepe (José Jesús La Casa Nieto)</span>
+    <span><strong>Fecha:</strong> septiembre de 2026</span>
+    <span><strong>Estado:</strong> planificación — sin código aún</span>
+  </div>
+
+  <section id="resumen">
+    <h2>1. Resumen ejecutivo</h2>
+    <p>
+      Este documento define el <strong>Proyecto 1</strong> de un plan más amplio de mejora de perfil
+      técnico: un asistente que responde preguntas en lenguaje natural sobre los documentos de mi tesis
+      doctoral (papers, notas, borradores) usando <strong>RAG (Retrieval-Augmented Generation)</strong>,
+      construido como un <strong>agente</strong> (no una cadena fija) capaz de decidir entre consultar mis
+      propios documentos o buscar papers nuevos en arXiv, con una pieza de <strong>automatización</strong>
+      que mantiene la base de conocimiento actualizada sin intervención manual.
+    </p>
+    <p>
+      El proyecto persigue dos objetivos a la vez: ser una herramienta que uso de verdad durante el
+      doctorado, y ser una pieza de portfolio que demuestra, con código real, la mayoría de los requisitos
+      técnicos que piden las ofertas de "Ingeniero/a de Software — IA Generativa" que estoy usando como
+      referencia de mercado (ver <a href="#requisitos">sección 8</a>).
+    </p>
+    <div class="callout note">
+      <span class="callabel">Contexto rápido para quien lea esto sin más contexto</span>
+      Soy ingeniero con formación en automatización industrial e IA, actualmente cursando un doctorado
+      sobre sensores ópticos para monitorización online de bioprocesos con microalgas en fotobiorreactores
+      abiertos. Hasta ahora he trabajado como Product Manager y desarrollador en un producto de
+      ciberseguridad (detección de incidentes de red), con experiencia previa como ingeniero de IA/ML en
+      otras empresas. Estoy reforzando mi perfil técnico (backend, APIs, MLOps) para volver a un rol más
+      centrado en ingeniería.
+    </div>
+  </section>
+
+  <section id="problema">
+    <h2>2. El problema</h2>
+
+    <h3>2.1 Contexto personal</h3>
+    <p>
+      Durante el doctorado voy acumulando una cantidad creciente de documentos: papers propios, papers de
+      referencia que leo, notas, borradores de capítulos. No tengo hoy una forma rápida de "preguntarle"
+      a ese conjunto de documentos algo concreto — tengo que recordar en qué archivo estaba cada cosa, o
+      releer por encima varios PDFs para encontrar un dato o una cita concreta. Además, mantenerme al día
+      de papers nuevos publicados sobre mi tema (sensores ópticos aplicados a microalgas, monitorización
+      online de bioprocesos) es un proceso manual que hago de forma irregular.
+    </p>
+
+    <h3>2.2 Problema concreto a resolver</h3>
+    <ul>
+      <li>Poder hacer preguntas en lenguaje natural sobre mis propios documentos de tesis y obtener una
+      respuesta con las fuentes exactas de donde sale esa información (no quiero un modelo que "se lo
+      invente" — necesito trazabilidad).</li>
+      <li>Poder preguntar por literatura reciente sobre mi tema sin tener que ir manualmente a buscar en
+      arXiv cada vez.</li>
+      <li>Que el sistema se mantenga actualizado solo, incorporando papers nuevos relevantes sin que yo
+      tenga que acordarme de hacerlo.</li>
+    </ul>
+
+    <h3>2.3 Por qué este proyecto (más allá de la utilidad directa)</h3>
+    <p>
+      Es el primero de los proyectos de mi plan de mejora de perfil porque cubre, casi al completo, la
+      parte más nueva para mí y más demandada en el mercado ahora mismo: integración de LLMs en
+      producción, RAG, agentes con LangChain/LangGraph, APIs con FastAPI, y buenas prácticas de ingeniería
+      (testing, Docker, CI/CD). El detalle exacto de qué requisitos de qué ofertas cubre está en la
+      <a href="#requisitos">sección 8</a>.
+    </p>
+  </section>
+
+  <section id="planteamiento">
+    <h2>3. Planteamiento de la solución</h2>
+
+    <h3>3.1 Enfoque general</h3>
+    <p>
+      El sistema tiene dos pipelines que comparten un mismo almacén de datos:
+    </p>
+    <ul>
+      <li><strong>Pipeline de ingesta</strong> — mete documentos en la base de conocimiento. Se dispara de
+      dos formas: manualmente (subo un PDF de tesis) o automáticamente (una vez a la semana, se buscan
+      papers nuevos en arXiv relacionados con mi tema y se ingestan solos).</li>
+      <li><strong>Pipeline de consulta</strong> — un agente construido con LangGraph recibe la pregunta,
+      decide si necesita buscar en mis documentos, buscar en arXiv, o ambas cosas, y compone la respuesta
+      final citando las fuentes.</li>
+    </ul>
+
+    <h3>3.2 Decisiones de diseño</h3>
+
+    <div class="callout decision">
+      <span class="callabel">Decisión — Orquestación: LangGraph en vez de un AgentExecutor clásico</span>
+      Ya tengo experiencia previa con LangGraph (lo usé en un pipeline de detección de incidentes). Un
+      grafo explícito (nodo agente → nodos herramienta → nodo respuesta) es más fácil de depurar y de
+      extender más adelante que la caja negra de un <code>AgentExecutor</code> tradicional, y es
+      exactamente lo que piden las ofertas que uso como referencia.
+    </div>
+
+    <div class="callout decision">
+      <span class="callabel">Decisión — Base vectorial: pgvector sobre Postgres, no Chroma/FAISS aparte</span>
+      Necesito Postgres de todas formas para guardar usuarios, historial de preguntas y metadatos de
+      documentos. Añadir pgvector evita sumar una pieza de infraestructura nueva (una base vectorial
+      dedicada) solo para este proyecto — con el volumen de documentos de una tesis, el rendimiento de
+      pgvector es más que suficiente. Si más adelante el proyecto creciera mucho, Chroma/Qdrant quedan
+      como opción de migración, no como decisión de partida.
+    </div>
+
+    <div class="callout decision">
+      <span class="callabel">Decisión — API: FastAPI, autenticación JWT simple</span>
+      Un único usuario real (yo) al principio, pero implemento JWT desde el inicio porque es parte de lo
+      que quiero demostrar que sé hacer, no porque lo necesite operativamente todavía.
+    </div>
+
+    <div class="callout decision">
+      <span class="callabel">Decisión — Extracción de PDFs</span>
+      Los documentos de tesis son PDFs con texto (no escaneados), así que basta con una librería de
+      extracción de texto estándar de Python; no hace falta OCR.
+    </div>
+
+    <h3 id="arquitectura">3.3 Diagrama de arquitectura</h3>
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 780 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;height:auto;">
+        <defs>
+          <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#334155"/>
+          </marker>
+        </defs>
+
+        <text x="15" y="18" font-size="12" font-weight="bold" fill="#0d9488">PIPELINE DE INGESTA</text>
+        <rect x="15" y="28" width="195" height="50" rx="8" fill="#eef2f7" stroke="#334155" stroke-width="1.2"/>
+        <text x="112" y="48" font-size="11" text-anchor="middle" fill="#1e293b">Documentos de tesis</text>
+        <text x="112" y="63" font-size="9.5" text-anchor="middle" fill="#64748b">(subida manual, una vez)</text>
+
+        <rect x="15" y="90" width="195" height="50" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.2"/>
+        <text x="112" y="110" font-size="11" text-anchor="middle" fill="#1e293b">arXiv: papers nuevos</text>
+        <text x="112" y="125" font-size="9.5" text-anchor="middle" fill="#92400e">(automático, cada semana)</text>
+
+        <line x1="210" y1="53" x2="255" y2="80" stroke="#334155" stroke-width="1.4" marker-end="url(#arr)"/>
+        <line x1="210" y1="115" x2="255" y2="88" stroke="#334155" stroke-width="1.4" marker-end="url(#arr)"/>
+
+        <rect x="258" y="55" width="170" height="55" rx="8" fill="#eef2f7" stroke="#334155" stroke-width="1.2"/>
+        <text x="343" y="78" font-size="11" text-anchor="middle" fill="#1e293b">Chunking +</text>
+        <text x="343" y="93" font-size="11" text-anchor="middle" fill="#1e293b">Embeddings</text>
+
+        <line x1="428" y1="82" x2="470" y2="82" stroke="#334155" stroke-width="1.4" marker-end="url(#arr)"/>
+
+        <rect x="473" y="50" width="200" height="65" rx="8" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.6"/>
+        <text x="573" y="76" font-size="12" text-anchor="middle" fill="#0f172a" font-weight="bold">Postgres + pgvector</text>
+        <text x="573" y="92" font-size="9.5" text-anchor="middle" fill="#0f172a">documentos · chunks · usuarios ·</text>
+        <text x="573" y="104" font-size="9.5" text-anchor="middle" fill="#0f172a">historial de preguntas</text>
+
+        <line x1="60" y1="170" x2="780" y2="170" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="15" y="195" font-size="12" font-weight="bold" fill="#1d4ed8">PIPELINE DE CONSULTA (AGENTE)</text>
+
+        <rect x="15" y="210" width="130" height="46" rx="8" fill="#eef2f7" stroke="#334155" stroke-width="1.2"/>
+        <text x="80" y="238" font-size="11" text-anchor="middle" fill="#1e293b">Usuario pregunta</text>
+        <line x1="145" y1="233" x2="185" y2="233" stroke="#334155" stroke-width="1.4" marker-end="url(#arr)"/>
+
+        <rect x="188" y="210" width="160" height="46" rx="8" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+        <text x="268" y="233" font-size="11" text-anchor="middle" fill="#0f172a">Agente</text>
+        <text x="268" y="247" font-size="9" text-anchor="middle" fill="#0f172a">(LangGraph)</text>
+
+        <line x1="230" y1="256" x2="150" y2="290" stroke="#334155" stroke-width="1.3" marker-end="url(#arr)"/>
+        <line x1="150" y1="290" x2="230" y2="256" stroke="#334155" stroke-width="1" stroke-dasharray="2,3"/>
+        <line x1="310" y1="256" x2="390" y2="290" stroke="#334155" stroke-width="1.3" marker-end="url(#arr)"/>
+        <line x1="390" y1="290" x2="310" y2="256" stroke="#334155" stroke-width="1" stroke-dasharray="2,3"/>
+
+        <rect x="45" y="293" width="200" height="50" rx="8" fill="#eef2f7" stroke="#334155" stroke-width="1.2"/>
+        <text x="145" y="313" font-size="10.5" text-anchor="middle" fill="#1e293b">Tool: buscar_en_mis_</text>
+        <text x="145" y="327" font-size="10.5" text-anchor="middle" fill="#1e293b">documentos</text>
+
+        <rect x="295" y="293" width="200" height="50" rx="8" fill="#eef2f7" stroke="#334155" stroke-width="1.2"/>
+        <text x="395" y="313" font-size="10.5" text-anchor="middle" fill="#1e293b">Tool: buscar_papers_</text>
+        <text x="395" y="327" font-size="10.5" text-anchor="middle" fill="#1e293b">arxiv (consulta puntual)</text>
+
+        <path d="M145,293 C145,180 480,120 570,116" fill="none" stroke="#0d9488" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+        <text x="330" y="180" font-size="9" fill="#0d9488" font-style="italic">lee de la misma base vectorial</text>
+
+        <line x1="348" y1="228" x2="560" y2="228" stroke="#334155" stroke-width="1.4" marker-end="url(#arr)"/>
+        <rect x="563" y="205" width="200" height="50" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.4"/>
+        <text x="663" y="225" font-size="11" text-anchor="middle" fill="#0f172a">Respuesta</text>
+        <text x="663" y="239" font-size="9.5" text-anchor="middle" fill="#0f172a">+ fuentes citadas</text>
+      </svg>
+      <div class="diagram-caption">Ambos pipelines comparten la misma base Postgres + pgvector: lo que entra por ingesta (manual o automática) es lo que el agente puede consultar.</div>
+    </div>
+  </section>
+
+  <section id="modelo-datos">
+    <h2>4. Modelo de datos (esquema simplificado)</h2>
+    <p>Cinco tablas en Postgres. Los nombres son orientativos, se pueden ajustar al implementar.</p>
+    <pre><code>documentos
+  id            uuid PK
+  titulo        text
+  fuente        text        -- 'manual' | 'arxiv'
+  url_original  text null   -- si viene de arxiv
+  fecha_ingesta timestamptz
+
+chunks
+  id            uuid PK
+  documento_id  uuid FK -> documentos.id
+  contenido     text
+  embedding     vector(1536)   -- columna pgvector
+  posicion      int            -- orden dentro del documento
+
+usuarios
+  id            uuid PK
+  email         text unique
+  password_hash text
+
+historial_preguntas
+  id            uuid PK
+  usuario_id    uuid FK -> usuarios.id
+  pregunta      text
+  respuesta     text
+  tool_usada    text        -- 'rag' | 'arxiv' | 'ambas'
+  fecha         timestamptz
+
+papers_arxiv_vistos
+  id            uuid PK
+  arxiv_id      text unique   -- para no re-ingestar el mismo paper dos veces
+  fecha_vista   timestamptz</code></pre>
+    <div class="callout note">
+      <span class="callabel">Nota</span>
+      <code>papers_arxiv_vistos</code> es la tabla que evita que la automatización semanal reingeste el
+      mismo paper una y otra vez — antes de ingestar, se comprueba si el <code>arxiv_id</code> ya está.
+    </div>
+  </section>
+
+  <section id="alcance">
+    <h2>5. Alcance del proyecto — Núcleo Pareto</h2>
+    <p>Qué entra en la primera versión funcional y qué queda fuera a propósito.</p>
+    <table>
+      <tr><th style="width:34%">Funcionalidad</th><th style="width:14%">¿En el MVP?</th><th>Motivo</th></tr>
+      <tr><td>Subir un documento y que se indexe (chunking + embeddings)</td><td class="yes">Sí</td><td>Sin esto no hay proyecto</td></tr>
+      <tr><td>Preguntar y recibir respuesta con fuentes</td><td class="yes">Sí</td><td>El núcleo del RAG</td></tr>
+      <tr><td>Agente con 2 tools (documentos propios + arXiv puntual)</td><td class="yes">Sí</td><td>Cubre el requisito de "agentes" de las ofertas</td></tr>
+      <tr><td>Automatización semanal de ingesta desde arXiv</td><td class="yes">Sí</td><td>Cubre "automatizaciones" y resuelve el problema real de mantenerme al día</td></tr>
+      <tr><td>Autenticación JWT</td><td class="yes">Sí</td><td>Parte del núcleo Pareto de FastAPI que quiero demostrar</td></tr>
+      <tr><td>Tests con pytest de los endpoints críticos</td><td class="yes">Sí</td><td>Buenas prácticas, requisito explícito de las ofertas</td></tr>
+      <tr><td>Docker Compose (api + postgres) + GitHub Actions</td><td class="yes">Sí</td><td>Idem</td></tr>
+      <tr><td>Interfaz web (más allá de la documentación automática de FastAPI)</td><td class="no">No</td><td>No aporta a los requisitos técnicos que quiero demostrar; los endpoints ya se pueden probar desde <code>/docs</code></td></tr>
+      <tr><td>Multiusuario real / gestión de permisos avanzada</td><td class="no">No</td><td>Solo lo voy a usar yo — un usuario basta para demostrar el patrón JWT</td></tr>
+      <tr><td>Evaluación automática del RAG (tipo RAGAS)</td><td class="no">No</td><td>Extensión de profundización, no núcleo Pareto (ver guía general)</td></tr>
+      <tr><td>Despliegue en la nube de este proyecto en concreto</td><td class="no">No</td><td>El despliegue en AWS es el objetivo específico del Proyecto 2 — aquí me centro en RAG + agente</td></tr>
+    </table>
+  </section>
+
+  <section id="agente-tools">
+    <h2>6. El agente y sus herramientas</h2>
+    <p>
+      El agente sustituye a lo que en una versión más simple sería una cadena fija (LCEL). Recibe la
+      pregunta y decide qué tool(s) usar antes de responder — no siempre las mismas, no siempre en el
+      mismo orden.
+    </p>
+
+    <h3>Tool 1 — <code>buscar_en_mis_documentos</code></h3>
+    <ul>
+      <li>Entrada: la pregunta del usuario (o una reformulación que haga el propio agente)</li>
+      <li>Acción: embeddings de la pregunta → búsqueda por similitud en <code>chunks</code> (pgvector) → top-k fragmentos</li>
+      <li>Salida: fragmentos + metadatos del documento de origen (para poder citar la fuente)</li>
+    </ul>
+
+    <h3>Tool 2 — <code>buscar_papers_arxiv</code></h3>
+    <ul>
+      <li>Entrada: términos de búsqueda (el agente los extrae de la pregunta)</li>
+      <li>Acción: llamada a la API pública de arXiv, filtrando por categoría/tema relevante</li>
+      <li>Salida: lista de papers (título, autores, resumen, fecha, enlace)</li>
+      <li>Esta misma tool, reutilizada por el proceso de automatización semanal (ver más abajo), es la que decide qué ingestar</li>
+    </ul>
+
+    <h3>Automatización — ingesta semanal desde arXiv</h3>
+    <ul>
+      <li>Disparador: un job programado (cron simple o GitHub Actions con <code>schedule</code>), una vez por semana</li>
+      <li>Pasos: <code>buscar_papers_arxiv</code> con mis términos de interés → descartar los que ya están en <code>papers_arxiv_vistos</code> → para cada paper nuevo: descargar el PDF, chunking, embeddings, guardar en <code>chunks</code></li>
+      <li>No pasa por el agente — es un script/pipeline directo, más simple y más barato de ejecutar que invocar un LLM para decidir algo que ya sabemos que hay que hacer cada semana</li>
+    </ul>
+
+    <div class="callout decision">
+      <span class="callabel">Decisión — por qué la automatización no usa el agente</span>
+      Un agente tiene sentido cuando hace falta decidir dinámicamente qué hacer. La ingesta semanal
+      siempre hace lo mismo (buscar, filtrar duplicados, ingestar) — meter un LLM en ese bucle solo
+      añadiría coste y latencia sin ningún beneficio. El agente es para cuando <em>yo</em> pregunto algo
+      impredecible; la automatización es un pipeline determinista de datos.
+    </div>
+  </section>
+
+  <section id="requisitos">
+    <h2>7. Requisitos del puesto que cubre este proyecto</h2>
+    <p>Referencia: ofertas de "Ingeniero/a de Software — IA Generativa" y "Desarrollador/a de Software" de JCARRION (PITA, Almería), usadas como vara de medir de mercado.</p>
+    <table>
+      <tr><th style="width:46%">Requisito de la oferta</th><th style="width:16%">¿Lo cubre?</th><th>Cómo</th></tr>
+      <tr><td>LLMs integrados en entornos productivos</td><td class="yes">Sí</td><td>Núcleo del proyecto</td></tr>
+      <tr><td>Pipelines RAG (embeddings, búsqueda semántica, BD vectorial)</td><td class="yes">Sí</td><td>Tool 1 + pgvector</td></tr>
+      <tr><td>Agentes y automatizaciones con LangChain</td><td class="yes">Sí</td><td>Agente LangGraph + ingesta semanal automática</td></tr>
+      <tr><td>APIs escalables con FastAPI</td><td class="yes">Sí</td><td>Toda la capa de API</td></tr>
+      <tr><td>Buenas prácticas: testing y CI/CD</td><td class="yes">Sí</td><td>pytest + GitHub Actions</td></tr>
+      <tr><td>Buenas prácticas: code review</td><td class="partial">Parcial</td><td>Un proyecto en solitario no lo demuestra por sí solo — lo cubro con mi experiencia real en Infomicro</td></tr>
+      <tr><td>Bases de datos relacionales / NoSQL</td><td class="yes">Sí</td><td>Postgres + SQLAlchemy</td></tr>
+      <tr><td>Sistemas distribuidos / microservicios</td><td class="no">No</td><td>Fuera de alcance a propósito — es el objetivo del Proyecto 3</td></tr>
+      <tr><td>Entornos cloud</td><td class="no">No (en este proyecto)</td><td>Es el foco específico del Proyecto 2</td></tr>
+    </table>
+  </section>
+
+  <section id="plan-trabajo">
+    <h2>8. Plan de trabajo por fases</h2>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 0</span><span class="phase-title">Preparación del repositorio</span></div>
+      <div class="phase-goal">Tener el esqueleto del proyecto listo antes de escribir lógica de negocio.</div>
+      <ul>
+        <li>Crear el repo, estructura de carpetas (<code>app/</code>, <code>tests/</code>, <code>scripts/</code>)</li>
+        <li><code>docker-compose.yml</code> mínimo: servicio <code>api</code> + servicio <code>db</code> (Postgres con extensión pgvector)</li>
+        <li>Configuración de variables de entorno (<code>.env.example</code>)</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 1</span><span class="phase-title">Pipeline de ingesta manual</span></div>
+      <div class="phase-goal">Poder meter un PDF y que acabe convertido en chunks con embeddings en Postgres.</div>
+      <ul>
+        <li>Extracción de texto de PDF</li>
+        <li>Chunking (definir tamaño y overlap)</li>
+        <li>Generación de embeddings y guardado en la tabla <code>chunks</code></li>
+        <li>Script o endpoint simple para probarlo de punta a punta con 2-3 documentos reales de la tesis</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 2</span><span class="phase-title">RAG básico (sin agente todavía)</span></div>
+      <div class="phase-goal">Una chain LCEL simple que responde preguntas sobre lo ya indexado.</div>
+      <ul>
+        <li>Retriever sobre pgvector</li>
+        <li>Prompt que obliga a citar la fuente</li>
+        <li>Probarlo manualmente con preguntas reales sobre mis propios documentos</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 3</span><span class="phase-title">Envolver en FastAPI + autenticación</span></div>
+      <div class="phase-goal">Que lo de la Fase 2 sea un servicio real, no solo un script.</div>
+      <ul>
+        <li>Endpoint <code>POST /preguntas</code></li>
+        <li>Endpoint <code>POST /documentos</code> (subir e indexar)</li>
+        <li>JWT — login y protección de endpoints</li>
+        <li>Guardar cada pregunta/respuesta en <code>historial_preguntas</code></li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 4</span><span class="phase-title">Testing, Docker completo y CI/CD</span></div>
+      <div class="phase-goal">El repo tiene que quedar "presentable" antes de seguir añadiendo funcionalidad.</div>
+      <ul>
+        <li>Tests con pytest (mock del LLM) de los endpoints principales</li>
+        <li><code>Dockerfile</code> de la API + <code>docker-compose.yml</code> final</li>
+        <li>Workflow de GitHub Actions: tests en cada push</li>
+        <li>Primer <code>README.md</code> (con lo que salga de este documento)</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 5</span><span class="phase-title">Convertir la chain en agente (LangGraph)</span></div>
+      <div class="phase-goal">Cerrar el requisito de "agentes" — el punto que motivó este documento.</div>
+      <ul>
+        <li>Definir el grafo: nodo agente, nodo Tool 1, nodo Tool 2, nodo respuesta</li>
+        <li>Implementar <code>buscar_en_mis_documentos</code> como tool (reutiliza la Fase 2)</li>
+        <li>Implementar <code>buscar_papers_arxiv</code> como tool nueva</li>
+        <li>Probar casos donde el agente debe elegir cada tool, y un caso donde encadena ambas</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 6</span><span class="phase-title">Automatización semanal</span></div>
+      <div class="phase-goal">Cerrar el requisito de "automatizaciones".</div>
+      <ul>
+        <li>Script de ingesta automática (reutiliza Tool 2 + pipeline de la Fase 1)</li>
+        <li>Tabla <code>papers_arxiv_vistos</code> para evitar duplicados</li>
+        <li>Programarlo (cron local para probar, GitHub Actions <code>schedule</code> para la versión "real")</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head"><span class="phase-num">FASE 7</span><span class="phase-title">Pulido y documentación final</span></div>
+      <div class="phase-goal">Dejarlo listo para enseñar.</div>
+      <ul>
+        <li>README definitivo (arquitectura, cómo levantarlo en local, decisiones de diseño)</li>
+        <li>Revisar que el histórico de commits cuente una historia razonable (no hace falta rehacerlo, pero sí revisarlo)</li>
+        <li>Grabar un GIF corto o capturas de uso para el README</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="preguntas-abiertas">
+    <h2>9. Preguntas abiertas / decisiones pendientes</h2>
+    <div class="callout open">
+      <span class="callabel">Pendiente — proveedor de LLM y de embeddings</span>
+      ¿OpenAI (más simple para empezar) o un modelo abierto vía API (más barato/relevante para MLOps)?
+      Se puede empezar con OpenAI para no bloquear el desarrollo y valorar el cambio más adelante.
+    </div>
+    <div class="callout open">
+      <span class="callabel">Pendiente — corpus inicial de documentos</span>
+      Qué documentos concretos de la tesis uso para las primeras pruebas (deben ser documentos que yo
+      pueda compartir/mostrar sin problema si el repo acaba siendo público).
+    </div>
+    <div class="callout open">
+      <span class="callabel">Pendiente — términos de búsqueda para la automatización de arXiv</span>
+      Definir las categorías/keywords concretos (ej. sensores ópticos, monitorización de bioprocesos,
+      fotobiorreactores, microalgas) para que la ingesta semanal no traiga ruido irrelevante.
+    </div>
+    <div class="callout open">
+      <span class="callabel">Pendiente — visibilidad del repositorio</span>
+      Público desde el principio (mejor para portfolio) o privado hasta tenerlo presentable — y si
+      público, revisar que no haya nada de ASVerus ni datos sensibles en ningún commit.
+    </div>
+  </section>
+
+  <section id="como-usar">
+    <h2>10. Cómo usar este documento</h2>
+    <ul>
+      <li><strong>Como contexto para otra conversación de IA:</strong> este documento, pegado o adjuntado
+      entero, debería bastar para que cualquier chat de IA entienda el proyecto sin que yo tenga que
+      volver a explicarlo desde cero.</li>
+      <li><strong>Como base del <code>README.md</code>:</strong> las secciones 1, 2, 3 y 4 son
+      prácticamente el contenido de un README técnico decente, ya en el orden correcto.</li>
+      <li><strong>Como guía durante el desarrollo:</strong> la <a href="#plan-trabajo">sección 8</a> es el
+      checklist a seguir fase a fase, para no perder el hilo ni desviarme del alcance definido en la
+      <a href="#alcance">sección 5</a>.</li>
+      <li><strong>Para resolver dudas técnicas puntuales:</strong> las decisiones de diseño (recuadros
+      azules) explican el <em>porqué</em> de cada elección, así que sirven para no tener que volver a
+      discutir lo ya decidido cada vez que surja una duda.</li>
+    </ul>
+  </section>
+
+  <section id="glosario">
+    <h2>11. Glosario rápido</h2>
+    <dl class="glossary">
+      <dt>RAG (Retrieval-Augmented Generation)</dt>
+      <dd>Técnica que combina búsqueda de información propia con un LLM generativo, para que la respuesta se base en documentos reales en vez de solo en lo que el modelo aprendió en su entrenamiento.</dd>
+      <dt>Chunking</dt>
+      <dd>Dividir un documento largo en fragmentos más pequeños antes de vectorizarlo, para que la búsqueda por similitud sea precisa.</dd>
+      <dt>Embedding</dt>
+      <dd>Representación numérica (vector) de un texto que captura su significado, usada para comparar textos por similitud.</dd>
+      <dt>pgvector</dt>
+      <dd>Extensión de PostgreSQL que añade un tipo de columna vectorial y búsqueda por similitud, convirtiendo Postgres en una base de datos vectorial.</dd>
+      <dt>Agente</dt>
+      <dd>A diferencia de una cadena (chain) fija, un agente decide dinámicamente qué acción tomar (qué tool usar, en qué orden) según la pregunta recibida.</dd>
+      <dt>Tool</dt>
+      <dd>Una función concreta que un agente puede decidir invocar (ej. buscar en una base de datos, llamar a una API externa).</dd>
+      <dt>LangGraph</dt>
+      <dd>Librería para construir flujos de agentes como un grafo explícito de nodos y transiciones, en vez de una caja negra.</dd>
+      <dt>LCEL (LangChain Expression Language)</dt>
+      <dd>Sintaxis de LangChain para encadenar pasos con el operador <code>|</code>, usada en cadenas fijas (no agentes).</dd>
+      <dt>JWT (JSON Web Token)</dt>
+      <dd>Estándar para autenticar peticiones a una API mediante un token firmado, sin necesidad de mantener sesión en el servidor.</dd>
+    </dl>
+  </section>
+
+  <footer class="doc-footer">
+    Documento de contexto técnico del Proyecto 1 — generado como base de planificación antes de empezar a escribir código. Versión 1, septiembre de 2026.
+  </footer>
+
+</main>
+</div>
+</body>
+</html>
